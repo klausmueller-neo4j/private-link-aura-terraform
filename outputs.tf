@@ -27,5 +27,3 @@ output "test_vm_private_ip" {
   description = "Private IP of the test EC2 instance (if created)."
   value       = try(aws_instance.test[0].private_ip, null)
 }
-
-

@@ -34,6 +34,47 @@ resource "aws_subnet" "auto" {
   })
 }
 
+resource "aws_internet_gateway" "this" {
+  count  = local.create_networking ? 1 : 0
+  vpc_id = aws_vpc.auto[0].id
+
+  tags = merge(var.tags, {
+    Name = "aura-privatelink-igw"
+  })
+}
+
+resource "aws_subnet" "public" {
+  count                   = local.create_networking ? 1 : 0
+  vpc_id                  = aws_vpc.auto[0].id
+  availability_zone       = data.aws_availability_zones.available.names[0]
+  cidr_block              = cidrsubnet(aws_vpc.auto[0].cidr_block, 4, 3)
+  map_public_ip_on_launch = true
+
+  tags = merge(var.tags, {
+    Name = "aura-privatelink-public-subnet"
+  })
+}
+
+resource "aws_route_table" "public" {
+  count  = local.create_networking ? 1 : 0
+  vpc_id = aws_vpc.auto[0].id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.this[0].id
+  }
+
+  tags = merge(var.tags, {
+    Name = "aura-privatelink-public-rt"
+  })
+}
+
+resource "aws_route_table_association" "public" {
+  count          = local.create_networking ? 1 : 0
+  subnet_id      = aws_subnet.public[0].id
+  route_table_id = aws_route_table.public[0].id
+}
+
 locals {
   allowed_cidrs = var.allowed_cidr_blocks != null ? var.allowed_cidr_blocks : (
     local.create_networking ? [aws_vpc.auto[0].cidr_block] : [data.aws_vpc.this[0].cidr_block]
@@ -166,51 +207,70 @@ data "aws_ami" "al2023" {
   }
 }
 
-resource "aws_security_group" "test_vm" {
-  count       = var.create_test_vm ? 1 : 0
-  name        = "aura-privatelink-test-vm"
-  description = "Security group for PrivateLink test EC2"
-  vpc_id      = local.effective_vpc_id
-
-  egress {
-    description = "Allow all egress"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, {
-    Name = "aura-privatelink-test-vm"
-  })
-}
-
-resource "aws_vpc_security_group_ingress_rule" "test_vm_ssh" {
-  for_each          = var.create_test_vm && length(var.test_vm_ssh_cidr_blocks) > 0 ? toset(var.test_vm_ssh_cidr_blocks) : []
-  security_group_id = aws_security_group.test_vm[0].id
-  description       = "Allow SSH to test VM"
+resource "aws_vpc_security_group_ingress_rule" "ssh_managed_sg" {
+  for_each          = var.create_security_group && length(var.test_vm_ssh_cidr_blocks) > 0 ? toset(var.test_vm_ssh_cidr_blocks) : []
+  security_group_id = aws_security_group.this[0].id
+  description       = "Allow SSH to test VM (managed SG)"
   cidr_ipv4         = each.value
   from_port         = 22
   to_port           = 22
   ip_protocol       = "tcp"
 }
 
- 
+locals {
+  ssh_existing_pairs = !var.create_security_group && var.security_group_ids != null && length(var.test_vm_ssh_cidr_blocks) > 0 ? {
+    for pair in setproduct(var.security_group_ids, var.test_vm_ssh_cidr_blocks) :
+    "${pair[0]}|${pair[1]}" => { sg_id = pair[0], cidr = pair[1] }
+  } : {}
+}
+
+resource "aws_vpc_security_group_ingress_rule" "ssh_existing_sg" {
+  for_each          = local.ssh_existing_pairs
+  security_group_id = each.value.sg_id
+  description       = "Allow SSH to test VM (existing SG)"
+  cidr_ipv4         = each.value.cidr
+  from_port         = 22
+  to_port           = 22
+  ip_protocol       = "tcp"
+}
 
 resource "aws_instance" "test" {
   count                       = var.create_test_vm ? 1 : 0
   ami                         = data.aws_ami.al2023[0].id
   instance_type               = var.test_vm_instance_type
-  subnet_id                   = local.effective_subnet_ids[0]
-  vpc_security_group_ids      = [aws_security_group.test_vm[0].id]
-  associate_public_ip_address = false
-  key_name                    = var.test_vm_key_name
+  subnet_id                   = var.test_vm_subnet_id != null ? var.test_vm_subnet_id : (local.create_networking ? aws_subnet.public[0].id : local.effective_subnet_ids[0])
+  vpc_security_group_ids      = local.endpoint_sg_ids
+  associate_public_ip_address = var.test_vm_public_ip
+  key_name                    = coalesce(var.test_vm_key_name, try(aws_key_pair.test_vm[0].key_name, null))
 
   tags = merge(var.tags, {
     Name = "aura-privatelink-test-vm"
   })
 
   depends_on = [aws_vpc_endpoint.aura]
+}
+
+# -----------------------------
+# Optional Key Pair Generation
+# -----------------------------
+
+resource "tls_private_key" "test_vm" {
+  count     = var.create_test_vm && var.test_vm_key_name == null ? 1 : 0
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "test_vm" {
+  count      = var.create_test_vm && var.test_vm_key_name == null ? 1 : 0
+  key_name   = var.test_vm_generated_key_name
+  public_key = tls_private_key.test_vm[0].public_key_openssh
+}
+
+resource "local_file" "test_vm_private_key" {
+  count           = var.create_test_vm && var.test_vm_key_name == null ? 1 : 0
+  filename        = var.test_vm_private_key_output_path
+  content         = tls_private_key.test_vm[0].private_key_pem
+  file_permission = "0400"
 }
 
 

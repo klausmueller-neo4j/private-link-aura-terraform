@@ -6,6 +6,7 @@ This repository provisions an AWS VPC Interface Endpoint for a Neo4j Aura Privat
 - A VPC Interface Endpoint (`aws_vpc_endpoint`) targeting the Neo4j Aura PrivateLink service you provide via `service_name`.
 - Optional Security Group (managed) that allows inbound 80/443/7687 from allowed CIDRs (defaults to the VPC CIDR).
 - Private DNS enabled on the endpoint (when supported by the service).
+ - Optional networking when `vpc_id`/`subnet_ids` are omitted: a VPC (`10.16.0.0/16`), three private subnets for the endpoint ENIs, plus one public subnet, Internet Gateway, and a public route table for the test VM.
 
 ## Prerequisites
 - Terraform >= 1.3
@@ -68,9 +69,17 @@ terraform apply -auto-approve
 After this, the endpoint will have Private DNS enabled and DNS names resolvable inside your VPC.
 
 ### Optional: Test EC2 VM
-Set `create_test_vm = true` to spin up a small EC2 instance in the same subnets as the endpoint. You can optionally allow SSH by providing `test_vm_key_name` and `test_vm_ssh_cidr_blocks`. The VM runs a simple startup script that logs DNS and port checks (80/443/7687) for the endpoint DNS names into `/var/log/aura-privatelink-check.log`.
+Set `create_test_vm = true` to spin up a small EC2 instance. By default:
+- If networking is auto-created, a public subnet and Internet Gateway are created and the VM gets a public IP.
+- If you provide an existing VPC, the VM will use the first provided subnet unless you set `test_vm_subnet_id`. Set `test_vm_public_ip = true` and ensure the subnet is public (has a route to an IGW) if you want SSH over the Internet.
 
-Outputs include `test_vm_instance_id` and `test_vm_private_ip`.
+SSH and keys:
+- If you set `test_vm_key_name`, that key pair is used.
+- If not, Terraform generates a key pair (`test_vm_generated_key_name`) and writes the private key to `test_vm_private_key_output_path` (default `ssh/test-vm-key.pem`, mode 0400). Keep it safe.
+
+The test VM reuses the endpoint Security Group. Allow SSH from your IPs via `test_vm_ssh_cidr_blocks` (Terraform adds port 22 rules to the SG).
+
+Outputs include `test_vm_instance_id`, `test_vm_private_ip`.
 
 ## Private DNS
 This configuration sets `private_dns_enabled = true` by default. The underlying service must support Private DNS; if it does not, set `enable_private_dns = false`.

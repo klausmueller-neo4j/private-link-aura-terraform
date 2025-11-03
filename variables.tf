@@ -24,7 +24,7 @@ variable "service_name" {
 variable "enable_private_dns" {
   description = "Enable Private DNS for the endpoint (must be supported by the service)."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "security_group_ids" {
@@ -73,10 +73,34 @@ variable "test_vm_key_name" {
   default     = null
 }
 
+variable "test_vm_generated_key_name" {
+  description = "Name to use when generating an EC2 Key Pair if test_vm_key_name is not provided."
+  type        = string
+  default     = "aura-privatelink-test-key"
+}
+
+variable "test_vm_private_key_output_path" {
+  description = "Local filesystem path to write the generated private key PEM (only when generating a key)."
+  type        = string
+  default     = "ssh/test-vm-key.pem"
+}
+
 variable "test_vm_ssh_cidr_blocks" {
   description = "CIDR blocks allowed to SSH (port 22) into the test VM. If empty, no SSH is allowed."
   type        = list(string)
   default     = []
+}
+
+variable "test_vm_public_ip" {
+  description = "Whether to associate a public IP to the test VM."
+  type        = bool
+  default     = true
+}
+
+variable "test_vm_subnet_id" {
+  description = "Optional subnet ID for the test VM. If null and networking is auto-created, a public subnet will be created and used; otherwise the first effective subnet is used."
+  type        = string
+  default     = null
 }
 
 

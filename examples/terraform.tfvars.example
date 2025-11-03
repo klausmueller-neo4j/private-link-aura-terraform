@@ -1,14 +1,16 @@
-# REQUIRED
+# REQUIRED: Region and service name
 aws_region   = "us-east-1"
-vpc_id       = "vpc-0123456789abcdef0"
-subnet_ids   = [
-  "subnet-aaaabbbbcccc11111",
-  "subnet-ddddeeeeffff22222",
-  "subnet-gggghhhhiiii33333",
-]
 
 # Neo4j Aura provided PrivateLink service name (example value below)
 service_name = "com.amazonaws.vpce.us-east-1.vpce-svc-086b958b3de5bbdb5"
+
+# OPTIONAL: Use existing VPC and subnets (if omitted, a new VPC with 3 subnets will be created)
+# vpc_id     = "vpc-0123456789abcdef0"
+# subnet_ids = [
+#   "subnet-aaaabbbbcccc11111",
+#   "subnet-ddddeeeeffff22222",
+#   "subnet-gggghhhhiiii33333",
+# ]
 
 # OPTIONAL: Use an existing SG instead of creating one
 # create_security_group = false
@@ -17,7 +19,8 @@ service_name = "com.amazonaws.vpce.us-east-1.vpce-svc-086b958b3de5bbdb5"
 # OPTIONAL: Limit who can reach the endpoint ENIs (default = VPC CIDR)
 # allowed_cidr_blocks = ["10.0.0.0/16"]
 
-enable_private_dns = true
+# Private DNS requires a two-step apply. First apply with false, accept in Aura, then set true and apply again.
+enable_private_dns = false
 
 tags = {
   Project = "neo4j-aura-privatelink"
@@ -27,6 +30,9 @@ tags = {
 # OPTIONAL: Create a small EC2 to test connectivity
 # create_test_vm          = true
 # test_vm_instance_type   = "t3.micro"
-# test_vm_key_name        = "my-keypair-name" # if you want SSH
+# test_vm_public_ip       = true
+# test_vm_subnet_id       = "subnet-your-public-subnet" # when using existing VPC
+# test_vm_key_name        = "my-keypair-name"           # if you want to use an existing key
+# test_vm_generated_key_name       = "aura-privatelink-test-key" # used if key_name not set
+# test_vm_private_key_output_path  = "ssh/test-vm-key.pem"         # where to save generated key
 # test_vm_ssh_cidr_blocks = ["203.0.113.1/32"]
-
