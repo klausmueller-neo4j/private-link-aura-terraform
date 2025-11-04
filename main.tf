@@ -76,8 +76,10 @@ resource "aws_route_table_association" "public" {
 }
 
 locals {
-  allowed_cidrs = var.allowed_cidr_blocks != null ? var.allowed_cidr_blocks : (
-    local.create_networking ? [aws_vpc.auto[0].cidr_block] : [data.aws_vpc.this[0].cidr_block]
+  allowed_cidr = (
+    var.allowed_cidr_blocks != null && length(var.allowed_cidr_blocks) > 0
+  ) ? var.allowed_cidr_blocks[0] : (
+    local.create_networking ? aws_vpc.auto[0].cidr_block : data.aws_vpc.this[0].cidr_block
   )
 }
 
@@ -104,7 +106,7 @@ resource "aws_vpc_security_group_ingress_rule" "http" {
   count             = var.create_security_group ? 1 : 0
   security_group_id = aws_security_group.this[0].id
   description       = "Allow HTTP"
-  cidr_ipv4         = length(local.allowed_cidrs) == 1 ? local.allowed_cidrs[0] : null
+  cidr_ipv4         = local.allowed_cidr
   referenced_security_group_id = null
   from_port         = 80
   to_port           = 80
@@ -115,31 +117,11 @@ resource "aws_vpc_security_group_ingress_rule" "http" {
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "http_multi" {
-  for_each          = var.create_security_group && length(local.allowed_cidrs) > 1 ? toset(local.allowed_cidrs) : []
-  security_group_id = aws_security_group.this[0].id
-  description       = "Allow HTTP"
-  cidr_ipv4         = each.value
-  from_port         = 80
-  to_port           = 80
-  ip_protocol       = "tcp"
-}
-
 resource "aws_vpc_security_group_ingress_rule" "https" {
   count             = var.create_security_group ? 1 : 0
   security_group_id = aws_security_group.this[0].id
   description       = "Allow HTTPS"
-  cidr_ipv4         = length(local.allowed_cidrs) == 1 ? local.allowed_cidrs[0] : null
-  from_port         = 443
-  to_port           = 443
-  ip_protocol       = "tcp"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "https_multi" {
-  for_each          = var.create_security_group && length(local.allowed_cidrs) > 1 ? toset(local.allowed_cidrs) : []
-  security_group_id = aws_security_group.this[0].id
-  description       = "Allow HTTPS"
-  cidr_ipv4         = each.value
+  cidr_ipv4         = local.allowed_cidr
   from_port         = 443
   to_port           = 443
   ip_protocol       = "tcp"
@@ -149,17 +131,7 @@ resource "aws_vpc_security_group_ingress_rule" "bolt" {
   count             = var.create_security_group ? 1 : 0
   security_group_id = aws_security_group.this[0].id
   description       = "Allow Neo4j Bolt"
-  cidr_ipv4         = length(local.allowed_cidrs) == 1 ? local.allowed_cidrs[0] : null
-  from_port         = 7687
-  to_port           = 7687
-  ip_protocol       = "tcp"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "bolt_multi" {
-  for_each          = var.create_security_group && length(local.allowed_cidrs) > 1 ? toset(local.allowed_cidrs) : []
-  security_group_id = aws_security_group.this[0].id
-  description       = "Allow Neo4j Bolt"
-  cidr_ipv4         = each.value
+  cidr_ipv4         = local.allowed_cidr
   from_port         = 7687
   to_port           = 7687
   ip_protocol       = "tcp"
