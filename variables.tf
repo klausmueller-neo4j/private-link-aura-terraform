@@ -44,9 +44,13 @@ variable "create_security_group" {
 }
 
 variable "allowed_cidr_blocks" {
-  description = "CIDR blocks allowed to reach the endpoint ENIs via the managed Security Group. Defaults to the VPC CIDR if null."
+  description = "CIDR blocks allowed to reach the endpoint ENIs via the managed Security Group."
   type        = list(string)
-  default     = null
+  default     = ["0.0.0.0/0"]
+  validation {
+    condition     = length(var.allowed_cidr_blocks) > 0
+    error_message = "allowed_cidr_blocks must have at least one entry."
+  }
 }
 
 variable "tags" {
@@ -83,12 +87,6 @@ variable "test_vm_private_key_output_path" {
   description = "Local filesystem path to write the generated private key PEM (only when generating a key)."
   type        = string
   default     = "ssh/test-vm-key.pem"
-}
-
-variable "test_vm_ssh_cidr_blocks" {
-  description = "CIDR blocks allowed to SSH (port 22) into the test VM. If empty, no SSH is allowed."
-  type        = list(string)
-  default     = []
 }
 
 variable "test_vm_public_ip" {

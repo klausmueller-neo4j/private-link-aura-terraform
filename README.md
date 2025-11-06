@@ -4,7 +4,7 @@ This repository provisions an AWS VPC Interface Endpoint for a Neo4j Aura Privat
 
 ## What this creates
 - A VPC Interface Endpoint (`aws_vpc_endpoint`) targeting the Neo4j Aura PrivateLink service you provide via `service_name`.
-- Optional Security Group (managed) that allows inbound 80/443/7687 from allowed CIDRs (defaults to the VPC CIDR).
+- Optional Security Group (managed) that allows inbound 80/443/7687 from allowed CIDRs (defaults to 0.0.0.0/0).
 - Private DNS enabled on the endpoint (when supported by the service).
  - Optional networking when `vpc_id`/`subnet_ids` are omitted: a VPC (`10.16.0.0/16`), three private subnets for the endpoint ENIs, plus one public subnet, Internet Gateway, and a public route table for the test VM.
 
@@ -77,15 +77,15 @@ SSH and keys:
 - If you set `test_vm_key_name`, that key pair is used.
 - If not, Terraform generates a key pair (`test_vm_generated_key_name`) and writes the private key to `test_vm_private_key_output_path` (default `ssh/test-vm-key.pem`, mode 0400). Keep it safe.
 
-The test VM reuses the endpoint Security Group. Allow SSH from your IPs via `test_vm_ssh_cidr_blocks` (Terraform adds port 22 rules to the SG).
+The test VM reuses the endpoint Security Group. When `create_test_vm = true`, Terraform adds an SSH (22) rule using `allowed_cidr_blocks[0]` (default `0.0.0.0/0`). To restrict, set `allowed_cidr_blocks`.
 
 Outputs include `test_vm_instance_id`, `test_vm_private_ip`.
 
 ## Private DNS
-This configuration sets `private_dns_enabled = true` by default. The underlying service must support Private DNS; if it does not, set `enable_private_dns = false`.
+`enable_private_dns` defaults to `false`. Follow the two-step flow above (create, accept in Aura, then enable and re-apply). The underlying service must support Private DNS.
 
 ## Security group behavior
-- By default, a managed Security Group is created with inbound rules for TCP ports 80, 443, and 7687. The source is `allowed_cidr_blocks` if provided, otherwise the VPC CIDR.
+- By default, a managed Security Group is created with inbound rules for TCP ports 80, 443, and 7687. The source is `allowed_cidr_blocks` if provided, otherwise 0.0.0.0/0.
 - To reuse an existing Security Group, set `create_security_group = false` and provide `security_group_ids = ["sg-..."]`.
 
 ## Example `terraform.tfvars`

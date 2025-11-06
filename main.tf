@@ -76,11 +76,7 @@ resource "aws_route_table_association" "public" {
 }
 
 locals {
-  allowed_cidr = (
-    var.allowed_cidr_blocks != null && length(var.allowed_cidr_blocks) > 0
-  ) ? var.allowed_cidr_blocks[0] : (
-    local.create_networking ? aws_vpc.auto[0].cidr_block : data.aws_vpc.this[0].cidr_block
-  )
+  allowed_cidr = var.allowed_cidr_blocks[0]
 }
 
 resource "aws_security_group" "this" {
@@ -179,28 +175,21 @@ data "aws_ami" "al2023" {
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "ssh_managed_sg" {
-  for_each          = var.create_security_group && length(var.test_vm_ssh_cidr_blocks) > 0 ? toset(var.test_vm_ssh_cidr_blocks) : []
+resource "aws_vpc_security_group_ingress_rule" "ssh_managed_sg_default" {
+  count             = var.create_security_group && var.create_test_vm ? 1 : 0
   security_group_id = aws_security_group.this[0].id
-  description       = "Allow SSH to test VM (managed SG)"
-  cidr_ipv4         = each.value
+  description       = "Allow SSH to test VM (managed SG, default CIDR)"
+  cidr_ipv4         = local.allowed_cidr
   from_port         = 22
   to_port           = 22
   ip_protocol       = "tcp"
 }
 
-locals {
-  ssh_existing_pairs = !var.create_security_group && var.security_group_ids != null && length(var.test_vm_ssh_cidr_blocks) > 0 ? {
-    for pair in setproduct(var.security_group_ids, var.test_vm_ssh_cidr_blocks) :
-    "${pair[0]}|${pair[1]}" => { sg_id = pair[0], cidr = pair[1] }
-  } : {}
-}
-
-resource "aws_vpc_security_group_ingress_rule" "ssh_existing_sg" {
-  for_each          = local.ssh_existing_pairs
-  security_group_id = each.value.sg_id
-  description       = "Allow SSH to test VM (existing SG)"
-  cidr_ipv4         = each.value.cidr
+resource "aws_vpc_security_group_ingress_rule" "ssh_existing_sg_default" {
+  for_each          = (!var.create_security_group && var.security_group_ids != null && length(var.security_group_ids) > 0 && var.create_test_vm) ? toset(var.security_group_ids) : []
+  security_group_id = each.value
+  description       = "Allow SSH to test VM (existing SG, default CIDR)"
+  cidr_ipv4         = local.allowed_cidr
   from_port         = 22
   to_port           = 22
   ip_protocol       = "tcp"

@@ -16,8 +16,8 @@ service_name = "com.amazonaws.vpce.us-east-1.vpce-svc-086b958b3de5bbdb5"
 # create_security_group = false
 # security_group_ids    = ["sg-0123456789abcdef0"]
 
-# OPTIONAL: Limit who can reach the endpoint ENIs (default = VPC CIDR)
-# allowed_cidr_blocks = ["10.0.0.0/16"]
+# OPTIONAL: Limit who can reach the endpoint ENIs (default = 0.0.0.0/0)
+# allowed_cidr_blocks = ["203.0.113.1/32"]
 
 # Private DNS requires a two-step apply. First apply with false, accept in Aura, then set true and apply again.
 enable_private_dns = false
@@ -35,4 +35,3 @@ tags = {
 # test_vm_key_name        = "my-keypair-name"           # if you want to use an existing key
 # test_vm_generated_key_name       = "aura-privatelink-test-key" # used if key_name not set
 # test_vm_private_key_output_path  = "ssh/test-vm-key.pem"         # where to save generated key
-# test_vm_ssh_cidr_blocks = ["203.0.113.1/32"]
